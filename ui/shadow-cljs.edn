@@ -1,0 +1,13 @@
+;; shadow-cljs configuration
+{:source-paths
+ ["src/dev"
+  "src/main"
+  "src/test"]
+
+ :dependencies
+ [[reagent "1.2.0"]]
+
+ :builds
+ {:client {:target :browser
+           :output-dir "../resources/public/js/client"
+           :modules {:main {:init-fn com.bhlie.nia.v2.core/init}}}}}
