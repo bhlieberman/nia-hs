@@ -15,9 +15,14 @@
   (into [:div]
         (for [tag (.-scripts js/document)
               :let [text (.-innerText tag)]
-              :when (not (str/blank? text))]
-          (for [line (str/split-lines text)]
-            [:p line]))))
+              :when (not (str/blank? text))
+              :let [[canto title & lines] (str/split-lines text)]]
+          (into [:div 
+                 [:h1 canto] 
+                 [:h2 title]
+                 [:button "Next ->"]]
+                (for [line lines]
+                  [:p line])))))
 
 (defn clock []
   (r/with-let [current-time (r/atom nil)]
@@ -31,7 +36,6 @@
 
 (defn root-comp []
   [:div
-   [:f> clock]
    [get-script-tag]])
 
 (defn ^:dev/after-load render! []

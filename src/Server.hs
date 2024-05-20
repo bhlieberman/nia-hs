@@ -13,12 +13,13 @@ nameTemplate :: H.Html -> H.Html
 nameTemplate name = H.h1 $ "Hello" <> name
 
 htmlHeader :: H.Html
-htmlHeader = 
-    let charSet = H.meta H.! A.charset "UTF-8"
-        name_ = H.meta H.! A.name "viewport" H.! A.content "width=device-width"
-        docTitle = H.title "NIAv2.5"
-        head_ = H.head $ mconcat [charSet, name_, docTitle]
-    in H.html head_
+htmlHeader =
+  let charSet = H.meta H.! A.charset "UTF-8"
+      name_ = H.meta H.! A.name "viewport" H.! A.content "width=device-width"
+      docTitle = H.title "NIAv2.5"
+      css = H.link H.! A.rel "stylesheet" H.! A.href "https://cdn.jsdelivr.net/npm/water.css@2/out/dark.min.css"
+      head_ = H.head $ mconcat [charSet, name_, docTitle, css]
+   in H.html head_
 
 getStaticData :: IO String
 getStaticData = readFile "resources/public/canto_I/thesis.txt"
@@ -29,7 +30,7 @@ sampleData = H.script H.! A.type_ "text/plain"
 homeTemplate :: H.Html
 homeTemplate =
   let scriptTag = H.script H.! A.src "/js/client/main.js" $ pure ()
-      root = H.div H.! A.id "root" $ pure ()    
+      root = H.div H.! A.id "root" $ pure ()
    in H.docTypeHtml $
         H.html $
           mconcat
