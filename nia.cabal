@@ -71,6 +71,7 @@ library
   -- Other library packages from which modules are imported.
   build-depends:
     , base 
+    , network-uri
     , scotty
     , blaze-html
     , blaze-markup
