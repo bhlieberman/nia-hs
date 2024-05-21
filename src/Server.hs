@@ -6,7 +6,6 @@ import Control.Exception
 import Control.Monad
 import Control.Monad.IO.Class
 import Data.Either
-import qualified Data.Map.Strict as Map
 import qualified Data.Text.Lazy as TL
 import Network.URI
 import Network.Wai.Middleware.Static
@@ -15,6 +14,8 @@ import Text.Blaze.Html.Renderer.Text (renderHtml)
 import qualified Text.Blaze.Html5 as H
 import qualified Text.Blaze.Html5.Attributes as A
 import Web.Scotty (ActionM, get, html, middleware, parseParamList, pathParam, scotty, text)
+
+import Util (mkCantoNumeral)
 
 htmlHeader :: H.Html
 htmlHeader =
@@ -42,11 +43,6 @@ stdErrorHandler :: IOException -> IO String
 stdErrorHandler e = do
   hPutStr stderr $ show e
   return ""
-
-mkCantoNumeral :: Int -> String
-mkCantoNumeral num =
-  let cantoMap = Map.fromList [(1, "I"), (2, "II"), (4, "IV")] :: Map.Map Int String
-   in cantoMap Map.! num
 
 getCantoParens :: Int -> [Int] -> IO [String]
 getCantoParens canto parens =

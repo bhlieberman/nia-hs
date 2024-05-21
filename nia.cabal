@@ -60,10 +60,10 @@ library
   import:           warnings
 
   -- Modules exported by the library.
-  exposed-modules:  Server
+  exposed-modules:  Server, Data
 
   -- Modules included in this library but not exported.
-  -- other-modules:
+  other-modules: Util
 
   -- LANGUAGE extensions used by modules in this package.
   -- other-extensions:
@@ -76,6 +76,7 @@ library
     , bytestring
     , conduit
     , containers
+    , directory-tree
     , network-uri
     , scotty
     , text
