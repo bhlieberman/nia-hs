@@ -6,6 +6,7 @@ import Control.Exception
 import Control.Monad
 import Control.Monad.IO.Class
 import Data.Either
+import qualified Data.Map.Strict as Map
 import qualified Data.Text.Lazy as TL
 import Network.URI
 import Network.Wai.Middleware.Static
@@ -14,9 +15,6 @@ import Text.Blaze.Html.Renderer.Text (renderHtml)
 import qualified Text.Blaze.Html5 as H
 import qualified Text.Blaze.Html5.Attributes as A
 import Web.Scotty (ActionM, get, html, middleware, parseParamList, pathParam, scotty, text)
-
-nameTemplate :: H.Html -> H.Html
-nameTemplate name = H.h1 $ "Hello" <> name
 
 htmlHeader :: H.Html
 htmlHeader =
@@ -28,7 +26,7 @@ htmlHeader =
    in H.html head_
 
 getStaticData :: FilePath -> IO String
-getStaticData = readFile
+getStaticData = readFile'
 
 getPoemTheses :: IO [String]
 getPoemTheses = forM ["canto_I", "canto_II", "canto_IV"] $ do
@@ -40,23 +38,36 @@ getPoemTheses = forM ["canto_I", "canto_II", "canto_IV"] $ do
 decodeParams :: String -> Either TL.Text [Int]
 decodeParams s = parseParamList . TL.pack $ unEscapeString s
 
+stdErrorHandler :: IOException -> IO String
+stdErrorHandler e = do
+  hPutStr stderr $ show e
+  return ""
+
+mkCantoNumeral :: Int -> String
+mkCantoNumeral num =
+  let cantoMap = Map.fromList [(1, "I"), (2, "II"), (4, "IV")] :: Map.Map Int String
+   in cantoMap Map.! num
+
+getCantoParens :: Int -> [Int] -> IO [String]
+getCantoParens canto parens =
+  let file = "resources/public/canto_" ++ mkCantoNumeral canto ++ "/parenthesis"
+   in forM [file ++ "/par_" ++ show filename ++ ".txt" | filename <- parens :: [Int]] $ do
+        ( \p -> do
+            let parensTxt = getStaticData p
+             in parensTxt `catch` stdErrorHandler
+          )
+
 getCantoFootnotes :: Int -> [Int] -> IO [String]
 getCantoFootnotes canto footnote =
   forM ["footnote_" ++ show filename ++ ".txt" | filename <- footnote :: [Int]] $ do
     ( \f -> do
-        let canto_idx = ["I", "II", "IV"] :: [String]
-            romanNumeral = canto_idx !! canto
+        let romanNumeral = mkCantoNumeral canto
             path_ = "resources/public/canto_" ++ romanNumeral ++ "/footnotes/" ++ f
-         in getStaticData path_
-              `catch` ( \e -> do
-                          let err = show (e :: IOException)
-                          hPutStr stderr err
-                          return ""
-                      )
+         in getStaticData path_ `catch` stdErrorHandler
       )
 
-sampleData :: H.Html -> H.Html
-sampleData = H.script H.! A.type_ "text/plain"
+mkScriptTag :: H.Html -> H.Html
+mkScriptTag = H.script H.! A.type_ "text/plain"
 
 homeTemplate :: H.Html
 homeTemplate =
@@ -72,20 +83,29 @@ homeTemplate =
                     scriptTag
                   ]
             ]
+        
+silentFailParse :: String -> [Int]
+silentFailParse s = fromRight [] $ decodeParams s
+
+standardTextResp :: [String] -> ActionM ()
+standardTextResp s = text $ mconcat $ map TL.pack s
 
 runScotty :: IO ()
 runScotty = scotty 3000 $ do
   middleware $ staticPolicy (noDots >-> addBase "resources/public")
   get "/" $ do
     thesis <- liftIO getPoemTheses :: ActionM [String]
-    let theses = map (sampleData . H.toHtml) thesis
+    let theses = map (mkScriptTag . H.toHtml) thesis
     html $ renderHtml $ mconcat [homeTemplate, mconcat theses]
   get "/footnotes/:canto/:footnote" $ do
     canto <- pathParam "canto" :: ActionM Int
     footnote <- pathParam "footnote" :: ActionM String
-    let parsed = fromRight [] $ decodeParams footnote
+    let parsed = silentFailParse footnote
     footnotes <- liftIO $ getCantoFootnotes canto parsed :: ActionM [String]
-    text $ mconcat $ map TL.pack footnotes
-  get "/:name" $ do
-    name <- pathParam "name" :: ActionM String
-    html $ renderHtml $ nameTemplate $ H.toHtml name
+    standardTextResp footnotes
+  get "/parens/:canto/:parens" $ do
+    canto <- pathParam "canto" :: ActionM Int
+    parens <- pathParam "parens" :: ActionM String
+    let parsed = silentFailParse parens
+    parensParsed <- liftIO $ getCantoParens canto parsed :: ActionM [String]
+    standardTextResp parensParsed
