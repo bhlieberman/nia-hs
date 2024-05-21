@@ -70,12 +70,16 @@ library
 
   -- Other library packages from which modules are imported.
   build-depends:
-    , base 
-    , network-uri
-    , scotty
+    , base
     , blaze-html
     , blaze-markup
+    , bytestring
+    , conduit
+    , containers
+    , network-uri
+    , scotty
     , text
+    , utf8-string
     , wai-middleware-static
 
   -- Directories containing source files.
@@ -99,7 +103,7 @@ executable nia
 
   -- Other library packages from which modules are imported.
   build-depends:
-    , base 
+    , base
     , nia
     , scotty
 
