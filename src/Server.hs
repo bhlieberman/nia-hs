@@ -6,15 +6,18 @@ import Control.Exception
 import Control.Monad
 import Control.Monad.IO.Class
 import Data.Either
+import Data.Maybe
 import qualified Data.Text.Lazy as TL
 import Network.URI
 import Network.Wai.Middleware.Static
+import System.Directory.Tree
 import System.IO
 import Text.Blaze.Html.Renderer.Text (renderHtml)
 import qualified Text.Blaze.Html5 as H
 import qualified Text.Blaze.Html5.Attributes as A
 import Web.Scotty (ActionM, get, html, middleware, parseParamList, pathParam, scotty, text)
 
+import qualified Data as D
 import Util (mkCantoNumeral)
 
 htmlHeader :: H.Html
@@ -43,15 +46,6 @@ stdErrorHandler :: IOException -> IO String
 stdErrorHandler e = do
   hPutStr stderr $ show e
   return ""
-
-getCantoParens :: Int -> [Int] -> IO [String]
-getCantoParens canto parens =
-  let file = "resources/public/canto_" ++ mkCantoNumeral canto ++ "/parenthesis"
-   in forM [file ++ "/par_" ++ show filename ++ ".txt" | filename <- parens :: [Int]] $ do
-        ( \p -> do
-            let parensTxt = getStaticData p
-             in parensTxt `catch` stdErrorHandler
-          )
 
 getCantoFootnotes :: Int -> [Int] -> IO [String]
 getCantoFootnotes canto footnote =
@@ -86,6 +80,9 @@ silentFailParse s = fromRight [] $ decodeParams s
 standardTextResp :: [String] -> ActionM ()
 standardTextResp s = text $ mconcat $ map TL.pack s
 
+maybeTextResp :: [Maybe String] -> ActionM ()
+maybeTextResp ms = text $ mconcat $ map (TL.pack . fromJust) ms
+
 runScotty :: IO ()
 runScotty = scotty 3000 $ do
   middleware $ staticPolicy (noDots >-> addBase "resources/public")
@@ -99,9 +96,10 @@ runScotty = scotty 3000 $ do
     let parsed = silentFailParse footnote
     footnotes <- liftIO $ getCantoFootnotes canto parsed :: ActionM [String]
     standardTextResp footnotes
-  get "/parens/:canto/:parens" $ do
-    canto <- pathParam "canto" :: ActionM Int
+  get "/parens/:canto/:parens" $ do -- this is now all parens by default
+    canto <- pathParam "canto" :: ActionM Int -- maybe a query string can be used to filter?
     parens <- pathParam "parens" :: ActionM String
     let parsed = silentFailParse parens
-    parensParsed <- liftIO $ getCantoParens canto parsed :: ActionM [String]
-    standardTextResp parensParsed
+    let newParens = D.allParens >>= mapM D.walk
+    parensParsed <- liftIO newParens :: ActionM [Maybe String]
+    maybeTextResp parensParsed
