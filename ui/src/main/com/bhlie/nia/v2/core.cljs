@@ -18,16 +18,15 @@
           (for [line lines]
             [:p line]))))
 
-(defn show-parens [idx]
-  (r/with-let [cursor (r/cursor app-state [:parens])]
-    (let [parens (nth @cursor (dec idx))] 
-      (into [:div]
-            (for [line (str/split-lines parens)]
-              [:p line])))))
+(defn show-parens [canto idx]
+  (r/with-let [cursor (r/cursor app-state [:parens canto])]
+    (into [:div]
+          (for [line (str/split-lines (nth @cursor idx ""))]
+            [:p line]))))
 
 (defn parent [canto parens]
   (cond
-    (not (zero? @parens)) [show-parens @parens]
+    (not (zero? @parens)) [show-parens @canto @parens]
     (<= 1 @canto 3) [get-script-tag @canto]))
 
 (defn get-footnotes [canto]
@@ -44,15 +43,12 @@
 (defn get-parens [canto]
   (r/with-let [cursor (r/cursor app-state [:parens])]
     (let [ks (get @cursor canto)
-          parens (cond
-                   (empty? ks) (str/join "," (range 1 6))
-                   (every? int? ks) (str/join "," ks))]
-      (when-not (str/blank? parens)
-        (-> (js/fetch (str "http://localhost:3000/parens/" canto "/" parens))
-            (.then (fn [resp] (.text resp)))
-            (.then (fn [data]
-                     (js/console.log data)
-                     (reset! cursor (str/split data #"\n\n")))))))))
+          parens (if (every? int? ks) (str "?parens=" (str/join "," ks)) "")]
+      (-> (js/fetch (str "http://localhost:3000/parens/" canto parens))
+          (.then (fn [resp] (.text resp)))
+          (.then (fn [data]
+                   (js/console.log data)
+                   (swap! cursor assoc canto (str/split data #"\n\n"))))))))
 
 (defn router [canto parens]
   [:div
@@ -74,7 +70,7 @@
    [:button
     {:on-click
      (fn []
-       (when (not= @parens 5)
+       (when (not= @parens 4)
          (swap! parens inc)))} "Down"]])
 
 (defn root-comp []
@@ -91,7 +87,8 @@
   (render!))
 
 (comment
-  (reset! app-state {:footnotes {1 [1 2 3]}})
-  (get-in @app-state [:parens 1])
+  (reset! app-state {:footnotes {1 [1 2 3]}
+                     :parens {1 [1 2 3 4 5]}})
+  (get-in @app-state [:parens])
   (get-parens 1)
   (get-footnotes 1))
