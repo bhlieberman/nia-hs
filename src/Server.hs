@@ -11,6 +11,7 @@ import Data.Maybe
 import qualified Data.Text.Lazy as TL
 import Network.URI
 import Network.Wai.Middleware.Static
+import Poem
 import System.IO
 import Text.Blaze.Html.Renderer.Text (renderHtml)
 import qualified Text.Blaze.Html5 as H
@@ -72,6 +73,12 @@ homeTemplate =
                   ]
             ]
 
+wholeTemplate :: IO H.Html
+wholeTemplate =
+  let bodyTag = H.body H.! A.id "main-content" <$> renderWholePoem
+      header = pure htmlHeader :: IO H.Html
+   in (H.docTypeHtml . H.html . mconcat <$> sequence [header, bodyTag])
+
 silentFailParse :: String -> [Int]
 silentFailParse s = fromRight [] $ decodeParams s
 
@@ -85,6 +92,9 @@ runScotty = scotty 3000 $ do
     thesis <- liftIO getPoemTheses :: ActionM [String]
     let theses = map (mkScriptTag . H.toHtml) thesis
     html $ renderHtml $ mconcat [homeTemplate, mconcat theses]
+  get "/infinite" $ do
+    whole_ <- liftIO wholeTemplate
+    html $ renderHtml whole_
   get "/footnotes/:canto/:footnote" $ do
     canto <- pathParam "canto" :: ActionM Int
     footnote <- pathParam "footnote" :: ActionM String
@@ -97,7 +107,7 @@ runScotty = scotty 3000 $ do
     filter_ <-
       case filt of
         Just vals -> liftIO $ return $ silentFailParse vals
-        _ -> liftIO $ return [1..5]
+        _ -> liftIO $ return [1 .. 5]
     let canto_ = D.byCanto canto >>= D.byParens' filter_
     resp <- liftIO $ TL.pack . fromJust <$> canto_ :: ActionM TL.Text
     text resp

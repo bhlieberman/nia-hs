@@ -60,10 +60,13 @@ library
   import:           warnings
 
   -- Modules exported by the library.
-  exposed-modules:  Server, Data
+  exposed-modules:
+    Data
+    Poem
+    Server
 
   -- Modules included in this library but not exported.
-  other-modules: Util
+  other-modules:    Util
 
   -- LANGUAGE extensions used by modules in this package.
   -- other-extensions:
