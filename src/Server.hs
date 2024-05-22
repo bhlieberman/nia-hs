@@ -5,20 +5,18 @@ module Server (runScotty) where
 import Control.Exception
 import Control.Monad
 import Control.Monad.IO.Class
+import qualified Data as D
 import Data.Either
 import Data.Maybe
 import qualified Data.Text.Lazy as TL
 import Network.URI
 import Network.Wai.Middleware.Static
-import System.Directory.Tree
 import System.IO
 import Text.Blaze.Html.Renderer.Text (renderHtml)
 import qualified Text.Blaze.Html5 as H
 import qualified Text.Blaze.Html5.Attributes as A
-import Web.Scotty (ActionM, get, html, middleware, parseParamList, pathParam, scotty, text)
-
-import qualified Data as D
 import Util (mkCantoNumeral)
+import Web.Scotty (ActionM, get, html, middleware, parseParamList, pathParam, queryParamMaybe, scotty, text)
 
 htmlHeader :: H.Html
 htmlHeader =
@@ -73,15 +71,12 @@ homeTemplate =
                     scriptTag
                   ]
             ]
-        
+
 silentFailParse :: String -> [Int]
 silentFailParse s = fromRight [] $ decodeParams s
 
 standardTextResp :: [String] -> ActionM ()
 standardTextResp s = text $ mconcat $ map TL.pack s
-
-maybeTextResp :: [Maybe String] -> ActionM ()
-maybeTextResp ms = text $ mconcat $ map (TL.pack . fromJust) ms
 
 runScotty :: IO ()
 runScotty = scotty 3000 $ do
@@ -96,10 +91,13 @@ runScotty = scotty 3000 $ do
     let parsed = silentFailParse footnote
     footnotes <- liftIO $ getCantoFootnotes canto parsed :: ActionM [String]
     standardTextResp footnotes
-  get "/parens/:canto/:parens" $ do -- this is now all parens by default
-    canto <- pathParam "canto" :: ActionM Int -- maybe a query string can be used to filter?
-    parens <- pathParam "parens" :: ActionM String
-    let parsed = silentFailParse parens
-    let newParens = D.allParens >>= mapM D.walk
-    parensParsed <- liftIO newParens :: ActionM [Maybe String]
-    maybeTextResp parensParsed
+  get "/parens/:canto" $ do
+    canto <- pathParam "canto" :: ActionM Int
+    filt <- queryParamMaybe "parens" :: ActionM (Maybe String)
+    filter_ <-
+      case filt of
+        Just vals -> liftIO $ return $ silentFailParse vals
+        _ -> liftIO $ return [1..5]
+    let canto_ = D.byCanto canto >>= D.byParens' filter_
+    resp <- liftIO $ TL.pack . fromJust <$> canto_ :: ActionM TL.Text
+    text resp
