@@ -21,7 +21,7 @@ walk d filt =
 wholePoem :: IO (DirTree String)
 wholePoem = do
   _ :/ tree <- readDirectory "resources/public"
-  let poem = filterDir (\d -> name d /= "js") tree
+  let poem = filterDir (\d -> name d /= "js" && name d /= "css") tree
   return poem
 
 sortCantoDir :: DirTree String -> Maybe [DirTree String]

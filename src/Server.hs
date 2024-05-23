@@ -24,9 +24,22 @@ htmlHeader =
   let charSet = H.meta H.! A.charset "UTF-8"
       name_ = H.meta H.! A.name "viewport" H.! A.content "width=device-width"
       docTitle = H.title "NIAv2.5"
-      css = H.link H.! A.rel "stylesheet" H.! A.href "https://cdn.jsdelivr.net/npm/water.css@2/out/dark.min.css"
-      head_ = H.head $ mconcat [charSet, name_, docTitle, css]
+      waterCss = H.link H.! A.rel "stylesheet" H.! A.href "https://cdn.jsdelivr.net/npm/water.css@2/out/dark.min.css"
+      addCss = H.link H.! A.rel "stylesheet" H.! A.href "/css/nav.css"
+      head_ = H.head $ mconcat [charSet, name_, docTitle, waterCss, addCss]
    in H.html head_
+
+navBar :: H.Html
+navBar =
+  H.html $
+    H.nav H.! A.id "main-nav" $
+      H.ul $
+        mconcat
+          [ H.li $ (H.a H.! A.href "#") "Infinite",
+            H.li $ (H.a H.! A.href "#") "Canto I",
+            H.li $ (H.a H.! A.href "#") "Canto II",
+            H.li $ (H.a H.! A.href "#") "Canto IV"
+          ]
 
 getStaticData :: FilePath -> IO String
 getStaticData = readFile'
@@ -68,16 +81,17 @@ homeTemplate =
             [ htmlHeader,
               H.body $
                 mconcat
-                  [ root,
+                  [ navBar,
+                    root,
                     scriptTag
                   ]
             ]
 
 wholeTemplate :: IO H.Html
-wholeTemplate =
-  let bodyTag = H.body H.! A.id "main-content" <$> renderWholePoem
-      header = pure htmlHeader :: IO H.Html
-   in (H.docTypeHtml . H.html . mconcat <$> sequence [header, bodyTag])
+wholeTemplate = do
+  rendered <- liftIO renderWholePoem
+  let bodyTag = H.body H.! A.id "main-content" $ mconcat [htmlHeader, navBar, rendered]
+   in return (H.docTypeHtml . H.html $ bodyTag)
 
 silentFailParse :: String -> [Int]
 silentFailParse s = fromRight [] $ decodeParams s
