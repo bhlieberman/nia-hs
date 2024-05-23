@@ -3,15 +3,16 @@ module Data where
 import qualified Data.Foldable as F
 import Data.List
 import System.Directory.Tree
-  ( AnchoredDirTree (dirTree, (:/)),
-    DirTree (name),
-    contents,
-    dropTo,
-    file,
-    filterDir,
-    readDirectory,
-    sortDir,
-  )
+-- ( AnchoredDirTree (dirTree, (:/)),
+--   DirTree (name),
+--   contents,
+--   dropTo,
+--   file,
+--   filterDir,
+--   readDirectory,
+--   sortDir,
+--   (</$>)
+-- )
 import Util (mkCantoNumeral)
 
 walk :: Maybe (DirTree String) -> (DirTree String -> Bool) -> IO (Maybe String)
@@ -20,18 +21,17 @@ walk d filt =
    in return $ fmap (F.concat . sortDir . filterFn) d
 
 wholePoem :: IO (DirTree String)
-wholePoem = do
-  _ :/ tree <- readDirectory "resources/public"
-  let poem = filterDir (\d -> name d /= "js" && name d /= "css") tree
-  return poem
+wholePoem =
+  readDirectory "resources/public"
+    >>= (\(_ :/ tree) -> return $ filterDir (\d -> name d /= "assets") tree)
 
 sortCantoDir :: DirTree String -> Maybe [DirTree String]
-sortCantoDir dir = 
+sortCantoDir dir =
   let unsorted = contents dir
       thesis = find (\c -> name c == "thesis.txt") unsorted
       parens = sortDir <$> find (\c -> name c == "parenthesis") unsorted
       footnotes = sortDir <$> find (\c -> name c == "footnotes") unsorted
-      in sequenceA [thesis, parens, footnotes]
+   in sequenceA [thesis, parens, footnotes]
 
 byCanto :: Int -> IO (AnchoredDirTree String)
 byCanto c = do
@@ -41,11 +41,10 @@ byCanto c = do
 byCanto' :: Int -> IO String
 byCanto' c = do
   let path = mconcat ["resources/public/", "canto_", mkCantoNumeral c, "/thesis.txt"]
-  _:/tree <- readDirectory path
+  _ :/ tree <- readDirectory path
   putStrLn $ "searching for file at " ++ path
   let c_ = file tree
   return c_
-
 
 byFootnotes :: Int -> IO (Maybe (DirTree String))
 byFootnotes f = do
