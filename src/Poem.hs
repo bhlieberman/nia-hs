@@ -1,23 +1,32 @@
 module Poem (renderWholePoem) where
 
 import Control.Monad
-import Data (walk, wholePoem)
+import Data (sortCantoDir, wholePoem)
 import Data.Maybe
 import qualified Data.Text.Lazy as TL
+import System.Directory.Tree
 import qualified Text.Blaze.Html5 as H
-import qualified Text.Blaze.Html5.Attributes as A
 
-showWholePoem :: IO (Maybe String)
-showWholePoem = do
-  poem <- pure <$> wholePoem
-  walk poem $ const True
+showWholePoem' :: IO [String]
+showWholePoem' = do
+  whole <- wholePoem
+  let cnt = contents whole :: [DirTree String]
+      sorted =
+        fromJust $
+          forM
+            cnt
+            ( \c -> do
+                let sorted_ = sortCantoDir c
+                 in sorted_
+            )
+   in return $ concat <$> concat sorted
 
 renderWholePoem :: IO H.Html
 renderWholePoem = do
-  whole <- fromJust <$> showWholePoem
+  whole <- showWholePoem'
   html <-
     forM
-      (lines whole)
+      (concatMap lines whole)
       ( \l ->
           let txt = H.toHtml $ TL.pack l
               elem_ = H.p txt

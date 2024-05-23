@@ -2,7 +2,6 @@ module Data where
 
 import qualified Data.Foldable as F
 import Data.List
-import Data.Maybe
 import System.Directory.Tree
   ( AnchoredDirTree (dirTree, (:/)),
     DirTree (name),
