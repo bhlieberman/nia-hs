@@ -1,7 +1,17 @@
 module Data where
 
 import qualified Data.Foldable as F
+import Data.List
+import Data.Maybe
 import System.Directory.Tree
+  ( AnchoredDirTree (dirTree, (:/)),
+    DirTree (name),
+    contents,
+    dropTo,
+    filterDir,
+    readDirectory,
+    sortDir,
+  )
 import Util (mkCantoNumeral)
 
 walk :: Maybe (DirTree String) -> (DirTree String -> Bool) -> IO (Maybe String)
@@ -15,10 +25,19 @@ wholePoem = do
   let poem = filterDir (\d -> name d /= "js") tree
   return poem
 
+sortCantoDir :: DirTree String -> [DirTree String]
+sortCantoDir dir = 
+  let unsorted = contents dir
+      thesis = find (\c -> name c == "thesis.txt") unsorted
+      parens = sortDir <$> find (\c -> name c == "parenthesis") unsorted
+      footnotes = sortDir <$> find (\c -> name c == "footnotes") unsorted
+      sorted = []
+      in fromJust thesis : fromJust parens : fromJust footnotes : sorted
+
 byCanto :: Int -> IO (AnchoredDirTree String)
 byCanto c = do
   let cantoName = "canto_" ++ mkCantoNumeral c
-   in readDirectory $ "resources/public/" ++ cantoName
+   in readDirectory $ "resources/public/" ++ cantoName ++ "/thesis.txt"
 
 byFootnotes :: Int -> IO (Maybe (DirTree String))
 byFootnotes f = do
