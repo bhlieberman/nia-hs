@@ -7,6 +7,7 @@ import System.Directory.Tree
     DirTree (name),
     contents,
     dropTo,
+    file,
     filterDir,
     readDirectory,
     sortDir,
@@ -36,6 +37,15 @@ byCanto :: Int -> IO (AnchoredDirTree String)
 byCanto c = do
   let cantoName = "canto_" ++ mkCantoNumeral c
    in readDirectory $ "resources/public/" ++ cantoName ++ "/thesis.txt"
+
+byCanto' :: Int -> IO String
+byCanto' c = do
+  let path = mconcat ["resources/public/", "canto_", mkCantoNumeral c, "/thesis.txt"]
+  _:/tree <- readDirectory path
+  putStrLn $ "searching for file at " ++ path
+  let c_ = file tree
+  return c_
+
 
 byFootnotes :: Int -> IO (Maybe (DirTree String))
 byFootnotes f = do

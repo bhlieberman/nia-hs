@@ -12,6 +12,7 @@ import qualified Data.Text.Lazy as TL
 import Network.URI
 import Network.Wai.Middleware.Static
 import Poem
+import Data (byCanto')
 import System.IO
 import Text.Blaze.Html.Renderer.Text (renderHtml)
 import qualified Text.Blaze.Html5 as H
@@ -35,10 +36,10 @@ navBar =
     H.nav H.! A.id "main-nav" $
       H.ul $
         mconcat
-          [ H.li $ (H.a H.! A.href "#") "Infinite",
-            H.li $ (H.a H.! A.href "#") "Canto I",
-            H.li $ (H.a H.! A.href "#") "Canto II",
-            H.li $ (H.a H.! A.href "#") "Canto IV"
+          [ H.li $ (H.a H.! A.href "/infinite") "Infinite",
+            H.li $ (H.a H.! A.href "/canto/1") "Canto I",
+            H.li $ (H.a H.! A.href "/canto/2") "Canto II",
+            H.li $ (H.a H.! A.href "/canto/4") "Canto IV"
           ]
 
 getStaticData :: FilePath -> IO String
@@ -93,6 +94,11 @@ wholeTemplate = do
   let bodyTag = H.body H.! A.id "main-content" $ mconcat [htmlHeader, navBar, rendered]
    in return (H.docTypeHtml . H.html $ bodyTag)
 
+mainLayout :: H.Html -> H.Html
+mainLayout html_ = do
+  let body = H.body H.! A.id "main-content" $ mconcat [navBar, html_]
+   in (H.docTypeHtml . H.html $ mconcat [htmlHeader, body])
+
 silentFailParse :: String -> [Int]
 silentFailParse s = fromRight [] $ decodeParams s
 
@@ -109,12 +115,18 @@ runScotty = scotty 3000 $ do
   get "/infinite" $ do
     whole_ <- liftIO wholeTemplate
     html $ renderHtml whole_
+  get "/canto/:id" $ do
+    id_ <- pathParam "id" :: ActionM Int
+    canto_ <- liftIO $ byCanto' id_ :: ActionM String
+    html $ (renderHtml . mainLayout . H.toHtml . TL.pack) canto_
   get "/footnotes/:canto/:footnote" $ do
     canto <- pathParam "canto" :: ActionM Int
     footnote <- pathParam "footnote" :: ActionM String
     let parsed = silentFailParse footnote
     footnotes <- liftIO $ getCantoFootnotes canto parsed :: ActionM [String]
     standardTextResp footnotes
+  -- have a route that returns text and one that returns HTML for each of
+  -- parens and footnotes...
   get "/parens/:canto" $ do
     canto <- pathParam "canto" :: ActionM Int
     filt <- queryParamMaybe "parens" :: ActionM (Maybe String)
