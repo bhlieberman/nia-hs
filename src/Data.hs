@@ -25,14 +25,13 @@ wholePoem = do
   let poem = filterDir (\d -> name d /= "js") tree
   return poem
 
-sortCantoDir :: DirTree String -> [DirTree String]
+sortCantoDir :: DirTree String -> Maybe [DirTree String]
 sortCantoDir dir = 
   let unsorted = contents dir
       thesis = find (\c -> name c == "thesis.txt") unsorted
       parens = sortDir <$> find (\c -> name c == "parenthesis") unsorted
       footnotes = sortDir <$> find (\c -> name c == "footnotes") unsorted
-      sorted = []
-      in fromJust thesis : fromJust parens : fromJust footnotes : sorted
+      in sequenceA [thesis, parens, footnotes]
 
 byCanto :: Int -> IO (AnchoredDirTree String)
 byCanto c = do
