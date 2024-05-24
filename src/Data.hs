@@ -10,10 +10,8 @@ walk d filt =
   let filterFn = filterDir filt
    in return $ fmap (F.concat . sortDir . filterFn) d
 
-wholePoem :: IO (DirTree String)
-wholePoem =
-  readDirectory "resources/public"
-    >>= (\(_ :/ tree) -> return $ filterDir (\d -> name d /= "assets") tree)
+wholePoem :: IO (AnchoredDirTree String)
+wholePoem = filterDir (\d -> name d /= "assets") </$> readDirectory "resources/public"
 
 sortCantoDir :: DirTree String -> Maybe [DirTree String]
 sortCantoDir dir =
