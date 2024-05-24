@@ -21,31 +21,29 @@ sortCantoDir dir =
       footnotes = sortDir <$> find (\c -> name c == "footnotes") unsorted
    in sequenceA [thesis, parens, footnotes]
 
-byCanto :: Int -> IO (AnchoredDirTree String)
-byCanto c = do
-  let cantoName = "canto_" ++ mkCantoNumeral c
-   in readDirectory $ "resources/public/" ++ cantoName ++ "/thesis.txt"
-
 byCanto' :: Int -> IO String
 byCanto' c = do
   let path = mconcat ["resources/public/", "canto_", mkCantoNumeral c, "/thesis.txt"]
-  _ :/ tree <- readDirectory path
+  (_ :/ tree) <- readDirectory path
   putStrLn $ "searching for file at " ++ path
-  let c_ = file tree
-  return c_
+  return $ file tree
 
-byFootnotes :: Int -> IO (Maybe (DirTree String))
-byFootnotes f = do
-  anc@(_ :/ _) <- readDirectory $ "resources/public/" ++ "canto_" ++ mkCantoNumeral f
-  return $ dirTree <$> dropTo "footnotes" anc
+mkResourcePath :: Int -> String
+mkResourcePath c = "resources/public/" ++ "canto_" ++ mkCantoNumeral c
 
-byParens :: Int -> IO (Maybe (DirTree String))
-byParens p = do
-  anc@(_ :/ _) <- readDirectory $ "resources/public/" ++ "canto_" ++ mkCantoNumeral p
-  return $ dirTree <$> dropTo "parenthesis" anc
+resourceDir :: Int -> IO (AnchoredDirTree String)
+resourceDir c = readDirectory $ mkResourcePath c
 
-allCantos :: IO [AnchoredDirTree String]
-allCantos = sequence [byCanto 1, byCanto 2, byCanto 4]
+dropTo' :: AnchoredDirTree a -> FileName -> Maybe (AnchoredDirTree a)
+dropTo' = flip dropTo
+
+footnotesParens :: String -> Int -> IO (Maybe (DirTree String))
+footnotesParens fp i = do
+  dir <- resourceDir i
+  return $ dirTree <$> dropTo' dir fp
+
+allCantos :: IO [String]
+allCantos = sequence [byCanto' 1, byCanto' 2, byCanto' 4]
 
 byParens' :: [Int] -> AnchoredDirTree String -> IO (Maybe String)
 byParens' parens dir = do
@@ -55,7 +53,11 @@ byParens' parens dir = do
   walk tree filt
 
 allFootnotes :: IO [Maybe (DirTree String)]
-allFootnotes = sequence [byFootnotes 1, byFootnotes 2, byFootnotes 4]
+allFootnotes =
+  let f = footnotesParens "footnotes"
+   in sequence [f 1, f 2, f 4]
 
 allParens :: IO [Maybe (DirTree String)]
-allParens = sequence [byParens 1, byParens 2, byParens 4]
+allParens =
+  let f = footnotesParens "parenthesis"
+   in sequence [f 1, f 2, f 4]
