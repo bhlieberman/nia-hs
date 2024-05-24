@@ -3,16 +3,6 @@ module Data where
 import qualified Data.Foldable as F
 import Data.List
 import System.Directory.Tree
--- ( AnchoredDirTree (dirTree, (:/)),
---   DirTree (name),
---   contents,
---   dropTo,
---   file,
---   filterDir,
---   readDirectory,
---   sortDir,
---   (</$>)
--- )
 import Util (mkCantoNumeral)
 
 walk :: Maybe (DirTree String) -> (DirTree String -> Bool) -> IO (Maybe String)
