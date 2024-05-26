@@ -6,26 +6,22 @@ import Control.Exception
 import Control.Monad
 import Control.Monad.IO.Class
 import qualified Data as D
+import Data.ByteString.Builder (lazyByteString)
+import qualified Data.ByteString.Lazy.Char8 as C
+import qualified Data.ByteString.Lazy.UTF8 as L
 import Data.Either
-import Data.Maybe
+import qualified Data.List.Split as S
 import qualified Data.Text.Lazy as TL
-import Data.Traversable
 import Network.URI
+import Network.Wai
 import Network.Wai.Middleware.Static
 import System.IO
 import Templates
-import Text.Blaze.Html.Renderer.Text (renderHtml)
+import qualified Text.Blaze.Html.Renderer.Text as RT
+import Text.Blaze.Html.Renderer.Utf8 (renderHtml)
 import qualified Text.Blaze.Html5 as H
-import qualified Text.Blaze.Html5.Attributes as A
 import Util (mkCantoNumeral)
-import Web.Scotty (ActionM, get, html, middleware, parseParamList, pathParam, queryParamMaybe, scotty, text)
-
-getPoemTheses :: IO [String]
-getPoemTheses = forM ["canto_I", "canto_II", "canto_IV"] $ do
-  ( \n -> do
-      let path_ = "resources/public/" ++ n ++ "/thesis.txt"
-      readFile' path_
-    )
+import Web.Scotty (ActionM, get, html, middleware, parseParamList, pathParam, scotty, stream, text)
 
 decodeParams :: String -> Either TL.Text [Int]
 decodeParams s = parseParamList . TL.pack $ unEscapeString s
@@ -44,44 +40,39 @@ getCantoFootnotes canto footnote =
          in readFile' path_ `catch` stdErrorHandler
       )
 
-mkScriptTag :: H.Html -> H.Html
-mkScriptTag = H.script H.! A.type_ "text/plain"
-
 silentFailParse :: String -> [Int]
 silentFailParse s = fromRight [] $ decodeParams s
 
 standardTextResp :: [String] -> ActionM ()
 standardTextResp s = text $ mconcat $ map TL.pack s
 
--- textToHtml :: String -> [H.Html]
-textToHtml :: Applicative f => String -> f [H.Html]
-textToHtml s =
-  let lines' = lines s :: [String]
-   in for
-        lines'
-        ( \l ->
-            let html_ = H.toHtml $ TL.pack l :: H.Html
-                elem_ = H.p html_ :: H.Html
-             in pure elem_
-        )
+-- ty https://github.com/renanpvaz/rickastley.live/tree/master for the inspo...
+streaming :: StreamingBody
+streaming write flush_ = do
+  canto_ <- liftIO $ D.getCanto' 1
+  let html_ = D.getCantoHtml . D.getCantoFiles $ canto_ :: H.Html
+  let lines' = L.lines $ renderHtml html_
+  let loop (l:ls) = do
+          write $ lazyByteString $ C.unlines l
+          flush_
+          loop ls
+      loop [] = return []
+  void $ loop $ S.chunksOf 10 lines'
 
 runScotty :: IO ()
 runScotty = scotty 3000 $ do
   middleware $ staticPolicy (noDots >-> addBase "resources/public")
-  get "/" $ do
-    thesis <- liftIO getPoemTheses
-    template <- liftIO homeTemplate
-    let theses = map (mkScriptTag . H.toHtml) thesis
-    html $ renderHtml $ mconcat [template, mconcat theses]
   get "/infinite" $ do
     whole_ <- liftIO wholeTemplate
-    html $ renderHtml whole_
+    html $ RT.renderHtml whole_
+  get "/streamed" $ do
+    stream streaming
   get "/canto/html/:id" $ do
     id_ <- pathParam "id" :: ActionM Int
     canto_ <- liftIO $ D.getCanto' id_
-    let html_ =  D.getCantoHtml . D.getCantoFiles $ canto_
+    let html_ = D.getCantoHtml . D.getCantoFiles $ canto_
     template <- liftIO $ mainLayout html_
-    html $ renderHtml template
+    html $ RT.renderHtml template
   get "/canto/text/:id" $ do
     id_ <- pathParam "id"
     canto_ <- liftIO $ D.getCanto' id_
