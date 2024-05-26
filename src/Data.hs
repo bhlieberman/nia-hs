@@ -2,7 +2,10 @@ module Data where
 
 import qualified Data.Foldable as F
 import System.Directory.Tree
+import Text.Blaze (AttributeValue, stringValue)
 import qualified Text.Blaze.Html5 as H
+import qualified Text.Blaze.Html5.Attributes as A
+import qualified Data.Text.Lazy as TL
 import Util (mkCantoNumeral)
 
 walk :: Maybe (DirTree String) -> (DirTree String -> Bool) -> IO (Maybe String)
@@ -33,7 +36,12 @@ getCantoText d = mconcat $ map file d
 
 getCantoHtml :: [DirTree String] -> H.Html
 getCantoHtml d =
-  let files = map (H.p . H.toHtml . file) d
+  let files_ = zip [1 ..] $ concatMap (lines . file) d :: [(Int, String)]
+      mkId i =
+        let id_ = "line-" ++ show i :: String
+         in stringValue id_ :: AttributeValue
+      elem_ (i, txt) = H.p H.! A.id (mkId i) $ (H.toHtml . TL.pack) txt
+      files = map elem_ files_
    in mconcat files
 
 mkResourcePath :: Int -> String
