@@ -28,7 +28,7 @@ navBar = do
         H.ul $
           mconcat
             [ H.li $ (H.a H.! A.href "/infinite") (H.i H.! A.class_ "fa fa-solid fa-infinity" $ pure ()),
-              -- H.li $ (H.a H.! A.href "/infinite") _svgI,
+              H.li $ (H.a H.! A.href "/canto/1") "Canto I",
               H.li $ (H.a H.! A.href "/canto/2") "Canto II",
               H.li $ (H.a H.! A.href "/canto/4") "Canto IV"
             ]
