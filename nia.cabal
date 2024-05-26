@@ -74,6 +74,7 @@ library
   -- Other library packages from which modules are imported.
   build-depends:
     , base
+    , binary
     , blaze-html
     , blaze-markup
     , bytestring
@@ -82,9 +83,11 @@ library
     , directory-tree
     , network-uri
     , scotty
+    , split
     , text
     , utf8-string
     , wai-middleware-static
+    , wai
 
   -- Directories containing source files.
   hs-source-dirs:   src
