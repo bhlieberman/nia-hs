@@ -5,11 +5,11 @@ module Server (runScotty) where
 import Control.Exception
 import Control.Monad
 import Control.Monad.IO.Class
-import Data (byCanto')
 import qualified Data as D
 import Data.Either
 import Data.Maybe
 import qualified Data.Text.Lazy as TL
+import Data.Traversable
 import Network.URI
 import Network.Wai.Middleware.Static
 import System.IO
@@ -53,6 +53,18 @@ silentFailParse s = fromRight [] $ decodeParams s
 standardTextResp :: [String] -> ActionM ()
 standardTextResp s = text $ mconcat $ map TL.pack s
 
+-- textToHtml :: String -> [H.Html]
+textToHtml :: Applicative f => String -> f [H.Html]
+textToHtml s =
+  let lines' = lines s :: [String]
+   in for
+        lines'
+        ( \l ->
+            let html_ = H.toHtml $ TL.pack l :: H.Html
+                elem_ = H.p html_ :: H.Html
+             in pure elem_
+        )
+
 runScotty :: IO ()
 runScotty = scotty 3000 $ do
   middleware $ staticPolicy (noDots >-> addBase "resources/public")
@@ -64,26 +76,22 @@ runScotty = scotty 3000 $ do
   get "/infinite" $ do
     whole_ <- liftIO wholeTemplate
     html $ renderHtml whole_
-  get "/canto/:id" $ do
-    id_ <- pathParam "id"
-    canto_ <- liftIO $ byCanto' id_
-    template <- liftIO $ mainLayout . H.toHtml . TL.pack $ canto_
+  get "/canto/html/:id" $ do
+    id_ <- pathParam "id" :: ActionM Int
+    canto_ <- liftIO $ D.getCanto' id_
+    let html_ =  D.getCantoHtml . D.getCantoFiles $ canto_
+    template <- liftIO $ mainLayout html_
     html $ renderHtml template
+  get "/canto/text/:id" $ do
+    id_ <- pathParam "id"
+    canto_ <- liftIO $ D.getCanto' id_
+    text $ (TL.pack . D.getCantoText . D.getCantoFiles) canto_
   get "/footnotes/:canto/:footnote" $ do
     canto <- pathParam "canto"
     footnote <- pathParam "footnote"
     let parsed = silentFailParse footnote
     footnotes <- liftIO $ getCantoFootnotes canto parsed
     standardTextResp footnotes
-  -- have a route that returns text and one that returns HTML for each of
-  -- parens and footnotes...
-  get "/parens/:canto" $ do
-    canto <- pathParam "canto"
-    filt <- queryParamMaybe "parens"
-    filter_ <-
-      case filt of
-        Just vals -> liftIO $ return $ silentFailParse vals
-        _ -> liftIO $ return [1 .. 5]
-    let canto_ = D.byCanto canto >>= D.byParens' filter_
-    resp <- liftIO $ TL.pack . fromJust <$> canto_
-    text resp
+
+-- have a route that returns text and one that returns HTML for each of
+-- parens and footnotes...
