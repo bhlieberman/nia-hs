@@ -21,7 +21,7 @@ import qualified Text.Blaze.Html.Renderer.Text as RT
 import Text.Blaze.Html.Renderer.Utf8 (renderHtml)
 import qualified Text.Blaze.Html5 as H
 import Util (mkCantoNumeral)
-import Web.Scotty (ActionM, get, html, middleware, parseParamList, pathParam, scotty, stream, text)
+import Web.Scotty (ActionM, get, html, middleware, parseParamList, pathParam, scotty, setHeader, stream, text)
 
 decodeParams :: String -> Either TL.Text [Int]
 decodeParams s = parseParamList . TL.pack $ unEscapeString s
@@ -49,15 +49,17 @@ standardTextResp s = text $ mconcat $ map TL.pack s
 -- ty https://github.com/renanpvaz/rickastley.live/tree/master for the inspo...
 streaming :: StreamingBody
 streaming write flush_ = do
-  canto_ <- liftIO $ D.getCanto' 1
-  let html_ = D.getCantoHtml . D.getCantoFiles $ canto_ :: H.Html
-  let lines' = L.lines $ renderHtml html_
-  let loop (l:ls) = do
-          write $ lazyByteString $ C.unlines l
-          flush_
-          loop ls
-      loop [] = return []
-  void $ loop $ S.chunksOf 10 lines'
+  canto_1 <- liftIO $ D.getCanto' 1
+  canto_2 <- liftIO $ D.getCanto' 2
+  let html_ = D.getCantoHtml . D.getCantoFiles $ canto_1
+  let html_2 = D.getCantoHtml . D.getCantoFiles $ canto_2
+  let lines' = mconcat [html_, html_2]
+  let loop (l : ls) = do
+        write $ lazyByteString $ C.unlines l
+        flush_
+        loop ls
+      loop [] = return ["\0"]
+  void $ loop lines'
 
 runScotty :: IO ()
 runScotty = scotty 3000 $ do
@@ -66,12 +68,13 @@ runScotty = scotty 3000 $ do
     whole_ <- liftIO wholeTemplate
     html $ RT.renderHtml whole_
   get "/streamed" $ do
+    setHeader "Access-Control-Allow-Origin" "*"
     stream streaming
   get "/canto/html/:id" $ do
     id_ <- pathParam "id" :: ActionM Int
     canto_ <- liftIO $ D.getCanto' id_
     let html_ = D.getCantoHtml . D.getCantoFiles $ canto_
-    template <- liftIO $ mainLayout html_
+    template <- liftIO $ mainLayout $ pure ()
     html $ RT.renderHtml template
   get "/canto/text/:id" $ do
     id_ <- pathParam "id"
