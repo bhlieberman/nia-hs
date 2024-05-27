@@ -1,8 +1,14 @@
 module Data where
 
+import qualified Data.ByteString.Lazy as L
 import qualified Data.Foldable as F
-import Data.List
+import Data.List.Split (chunksOf)
 import System.Directory.Tree
+import Text.Blaze (AttributeValue, stringValue)
+import qualified Text.Blaze.Html5 as H
+import qualified Text.Blaze.Html5.Attributes as A
+import Text.Blaze.Html.Renderer.Utf8 (renderHtml)
+import qualified Data.Text.Lazy as TL
 import Util (mkCantoNumeral)
 
 walk :: Maybe (DirTree String) -> (DirTree String -> Bool) -> IO (Maybe String)
@@ -13,51 +19,36 @@ walk d filt =
 wholePoem :: IO (AnchoredDirTree String)
 wholePoem = filterDir (\d -> name d /= "assets") </$> readDirectory "resources/public"
 
-sortCantoDir :: DirTree String -> Maybe [DirTree String]
-sortCantoDir dir =
-  let unsorted = contents dir
-      thesis = find (\c -> name c == "thesis.txt") unsorted
-      parens = sortDir <$> find (\c -> name c == "parenthesis") unsorted
-      footnotes = sortDir <$> find (\c -> name c == "footnotes") unsorted
-   in sequenceA [thesis, parens, footnotes]
+isFile :: DirTree a -> Bool
+isFile f =
+  case f of
+    File _ _ -> True
+    _ -> False
 
-byCanto' :: Int -> IO String
-byCanto' c = do
-  let path = mconcat ["resources/public/", "canto_", mkCantoNumeral c, "/thesis.txt"]
-  (_ :/ tree) <- readDirectory path
-  putStrLn $ "searching for file at " ++ path
-  return $ file tree
+getCanto' :: Int -> IO (DirTree String)
+getCanto' i = do
+  let num = mkCantoNumeral i
+  _:/tree <- readDirectory $ "resources/public/canto_" ++ num
+  return tree
+
+getCantoFiles :: DirTree String -> [DirTree String]
+getCantoFiles d = filter isFile $ contents $ sortDir d
+
+getCantoText :: [DirTree String] -> String
+getCantoText d = mconcat $ map file d
+
+getCantoHtml :: [DirTree String] -> [[L.ByteString]]
+getCantoHtml d =
+  let files_ = zip [1 ..] $ concatMap (lines . file) d :: [(Int, String)]
+      mkId i =
+        let id_ = "line-" ++ show i :: String
+         in stringValue id_ :: AttributeValue
+      elem_ (i, txt) = H.p H.! A.id (mkId i) $ (H.toHtml . TL.pack) txt
+      files = map (renderHtml . elem_) files_
+   in chunksOf 25 files
 
 mkResourcePath :: Int -> String
 mkResourcePath c = "resources/public/" ++ "canto_" ++ mkCantoNumeral c
 
 resourceDir :: Int -> IO (AnchoredDirTree String)
 resourceDir c = readDirectory $ mkResourcePath c
-
-dropTo' :: AnchoredDirTree a -> FileName -> Maybe (AnchoredDirTree a)
-dropTo' = flip dropTo
-
-footnotesParens :: String -> Int -> IO (Maybe (DirTree String))
-footnotesParens fp i = do
-  dir <- resourceDir i
-  return $ dirTree <$> dropTo' dir fp
-
-allCantos :: IO [String]
-allCantos = sequence [byCanto' 1, byCanto' 2, byCanto' 4]
-
-byParens' :: [Int] -> AnchoredDirTree String -> IO (Maybe String)
-byParens' parens dir = do
-  let tree = dirTree <$> dropTo "parenthesis" dir
-  let filt_ = map (\i -> "par_" ++ show i ++ ".txt") parens
-  let filt = (\d -> name d `elem` filt_)
-  walk tree filt
-
-allFootnotes :: IO [Maybe (DirTree String)]
-allFootnotes =
-  let f = footnotesParens "footnotes"
-   in sequence [f 1, f 2, f 4]
-
-allParens :: IO [Maybe (DirTree String)]
-allParens =
-  let f = footnotesParens "parenthesis"
-   in sequence [f 1, f 2, f 4]

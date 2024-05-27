@@ -5,27 +5,23 @@ module Server (runScotty) where
 import Control.Exception
 import Control.Monad
 import Control.Monad.IO.Class
-import Data (byCanto')
 import qualified Data as D
+import Data.ByteString.Builder (lazyByteString)
+import qualified Data.ByteString.Lazy.Char8 as C
+import qualified Data.ByteString.Lazy.UTF8 as L
 import Data.Either
-import Data.Maybe
+import qualified Data.List.Split as S
 import qualified Data.Text.Lazy as TL
 import Network.URI
+import Network.Wai
 import Network.Wai.Middleware.Static
 import System.IO
 import Templates
-import Text.Blaze.Html.Renderer.Text (renderHtml)
+import qualified Text.Blaze.Html.Renderer.Text as RT
+import Text.Blaze.Html.Renderer.Utf8 (renderHtml)
 import qualified Text.Blaze.Html5 as H
-import qualified Text.Blaze.Html5.Attributes as A
 import Util (mkCantoNumeral)
-import Web.Scotty (ActionM, get, html, middleware, parseParamList, pathParam, queryParamMaybe, scotty, text)
-
-getPoemTheses :: IO [String]
-getPoemTheses = forM ["canto_I", "canto_II", "canto_IV"] $ do
-  ( \n -> do
-      let path_ = "resources/public/" ++ n ++ "/thesis.txt"
-      readFile' path_
-    )
+import Web.Scotty (ActionM, get, html, middleware, parseParamList, pathParam, scotty, setHeader, stream, text)
 
 decodeParams :: String -> Either TL.Text [Int]
 decodeParams s = parseParamList . TL.pack $ unEscapeString s
@@ -44,46 +40,52 @@ getCantoFootnotes canto footnote =
          in readFile' path_ `catch` stdErrorHandler
       )
 
-mkScriptTag :: H.Html -> H.Html
-mkScriptTag = H.script H.! A.type_ "text/plain"
-
 silentFailParse :: String -> [Int]
 silentFailParse s = fromRight [] $ decodeParams s
 
 standardTextResp :: [String] -> ActionM ()
 standardTextResp s = text $ mconcat $ map TL.pack s
 
+-- ty https://github.com/renanpvaz/rickastley.live/tree/master for the inspo...
+streaming :: StreamingBody
+streaming write flush_ = do
+  canto_1 <- liftIO $ D.getCanto' 1
+  canto_2 <- liftIO $ D.getCanto' 2
+  let html_ = D.getCantoHtml . D.getCantoFiles $ canto_1
+  let html_2 = D.getCantoHtml . D.getCantoFiles $ canto_2
+  let lines' = mconcat [html_, html_2]
+  let loop (l : ls) = do
+        write $ lazyByteString $ C.unlines l
+        flush_
+        loop ls
+      loop [] = return ["\0"]
+  void $ loop lines'
+
 runScotty :: IO ()
 runScotty = scotty 3000 $ do
   middleware $ staticPolicy (noDots >-> addBase "resources/public")
-  get "/" $ do
-    thesis <- liftIO getPoemTheses
-    template <- liftIO homeTemplate
-    let theses = map (mkScriptTag . H.toHtml) thesis
-    html $ renderHtml $ mconcat [template, mconcat theses]
   get "/infinite" $ do
     whole_ <- liftIO wholeTemplate
-    html $ renderHtml whole_
-  get "/canto/:id" $ do
+    html $ RT.renderHtml whole_
+  get "/streamed" $ do
+    setHeader "Access-Control-Allow-Origin" "*"
+    stream streaming
+  get "/canto/html/:id" $ do
+    id_ <- pathParam "id" :: ActionM Int
+    canto_ <- liftIO $ D.getCanto' id_
+    let html_ = D.getCantoHtml . D.getCantoFiles $ canto_
+    template <- liftIO $ mainLayout $ pure ()
+    html $ RT.renderHtml template
+  get "/canto/text/:id" $ do
     id_ <- pathParam "id"
-    canto_ <- liftIO $ byCanto' id_
-    template <- liftIO $ mainLayout . H.toHtml . TL.pack $ canto_
-    html $ renderHtml template
+    canto_ <- liftIO $ D.getCanto' id_
+    text $ (TL.pack . D.getCantoText . D.getCantoFiles) canto_
   get "/footnotes/:canto/:footnote" $ do
     canto <- pathParam "canto"
     footnote <- pathParam "footnote"
     let parsed = silentFailParse footnote
     footnotes <- liftIO $ getCantoFootnotes canto parsed
     standardTextResp footnotes
-  -- have a route that returns text and one that returns HTML for each of
-  -- parens and footnotes...
-  get "/parens/:canto" $ do
-    canto <- pathParam "canto"
-    filt <- queryParamMaybe "parens"
-    filter_ <-
-      case filt of
-        Just vals -> liftIO $ return $ silentFailParse vals
-        _ -> liftIO $ return [1 .. 5]
-    let canto_ = D.byCanto canto >>= D.byParens' filter_
-    resp <- liftIO $ TL.pack . fromJust <$> canto_
-    text resp
+
+-- have a route that returns text and one that returns HTML for each of
+-- parens and footnotes...

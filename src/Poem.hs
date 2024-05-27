@@ -3,8 +3,7 @@
 module Poem (renderWholePoem) where
 
 import Control.Monad
-import Data (sortCantoDir, wholePoem)
-import Data.Maybe
+import Data (wholePoem, walk)
 import qualified Data.Text as T
 import qualified Data.Text.Lazy as TL
 import System.Directory.Tree
@@ -12,19 +11,11 @@ import Text.Blaze (textValue)
 import qualified Text.Blaze.Html5 as H
 import qualified Text.Blaze.Html5.Attributes as A
 
-showWholePoem' :: IO [String]
+showWholePoem' :: IO (Maybe String)
 showWholePoem' = do
-  whole <- wholePoem
-  let cnt = contents whole :: [DirTree String]
-      sorted =
-        fromJust $
-          forM
-            cnt
-            ( \c ->
-                let sorted_ = sortCantoDir c
-                 in sorted_
-            )
-   in return $ concat <$> concat sorted
+  _ :/ tree <- sortDir </$> wholePoem
+  let walkable = pure tree :: Maybe (DirTree String)
+  walk walkable $ const True
 
 renderWholePoem :: IO H.Html
 renderWholePoem = do

@@ -3,11 +3,13 @@
  ["src/dev"
   "src/main"
   "src/test"]
+ 
+ :dev-http {8080 "../resources/public"}
 
  :dependencies
  [[reagent "1.2.0"]]
 
  :builds
  {:client {:target :browser
-           :output-dir "../resources/public/js/client"
-           :modules {:main {:init-fn com.bhlie.nia.v2.core/init}}}}}
+           :output-dir "../resources/public/assets/js/client"
+           :modules {:main {:entries [com.bhlie.nia.v2.data]}}}}}
